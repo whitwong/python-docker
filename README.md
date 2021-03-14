@@ -79,3 +79,90 @@ COPY . .
 
 CMD [ "python3", "-m" , "flask", "run", "--host=0.0.0.0"]
 ```
+### Directory Structure
+Just to recap, we created a directory in our local machine called `python-docker` and created a simple Python application using the Flask framework. We also used the `requirements.txt` file to gather our requirements, and created a Dockerfile containing the commands to build an image. The Python application directory structure would now look like:
+```
+python-docker
+|____ app.py
+|____ requirements.txt
+|____ Dockerfile
+```
+### Build an Image
+Now that we've created our Dockerfile, let's build our image. To do this, we use the `docker build` command. The `docker build` command builds Docker images from a Dockerfile and a "context". A build's context is the set of files located in the specified PATH or URL. The Docker build process can access any of the files located in this context.
+
+The build command optionally takes a `--tag` flag. The tag is used to set the name of the image and an optional tag in the format `name:tag`. We'll leave off the optional `tag` for now to help simplify things. If you don't pass a tag, Docker uses "latest" as its default tag. You can see this in the last line of the build output.
+
+Build the Docker image:
+```
+docker build --tag python-docker .
+```
+You'll see an output similar to this:
+```
+Sending build context to Docker daemon  79.36kB
+Step 1/6 : FROM python:3.8-slim-buster
+3.8-slim-buster: Pulling from library/python
+6f28985ad184: Pull complete
+f58644152280: Pull complete
+456500070a3e: Pull complete
+9229690cc337: Pull complete
+47da0924d2de: Pull complete
+Digest: sha256:1389669225e7fa05a9bac20d64551b6b6d84ee3200330d8d8de74c6d2314fdc7
+Status: Downloaded newer image for python:3.8-slim-buster
+ ---> 8671a55eb48a
+Step 2/6 : WORKDIR /app
+ ---> Running in 1a052cfb4361
+Removing intermediate container 1a052cfb4361
+ ---> 39a8620d399b
+Step 3/6 : COPY requirements.txt requirements.txt
+ ---> 22e8ab00bb5a
+Step 4/6 : RUN pip3 install -r requirements.txt
+ ---> Running in 842b3832f45e
+Collecting click==7.1.2
+  Downloading click-7.1.2-py2.py3-none-any.whl (82 kB)
+Collecting Flask==1.1.2
+  Downloading Flask-1.1.2-py2.py3-none-any.whl (94 kB)
+Collecting itsdangerous==1.1.0
+  Downloading itsdangerous-1.1.0-py2.py3-none-any.whl (16 kB)
+Collecting Jinja2==2.11.3
+  Downloading Jinja2-2.11.3-py2.py3-none-any.whl (125 kB)
+Collecting MarkupSafe==1.1.1
+  Downloading MarkupSafe-1.1.1-cp38-cp38-manylinux2010_x86_64.whl (32 kB)
+Collecting Werkzeug==1.0.1
+  Downloading Werkzeug-1.0.1-py2.py3-none-any.whl (298 kB)
+Installing collected packages: MarkupSafe, Werkzeug, Jinja2, itsdangerous, click, Flask
+Successfully installed Flask-1.1.2 Jinja2-2.11.3 MarkupSafe-1.1.1 Werkzeug-1.0.1 click-7.1.2 itsdangerous-1.1.0
+Removing intermediate container 842b3832f45e
+ ---> 02d1c5ee79d6
+Step 5/6 : COPY . .
+ ---> a46dacc41a3d
+Step 6/6 : CMD ["python3", "-m", "flask", "run", "--host=0.0.0.0"]
+ ---> Running in da976c33fa87
+Removing intermediate container da976c33fa87
+ ---> 6af1fd62b67b
+Successfully built 6af1fd62b67b
+Successfully tagged python-docker:latest
+```
+### View local images
+To see a list of images we have on our local machine, we have 2 options. One is to use the CLI and the other is to use [Docker Desktop](https://docs.docker.com/desktop/dashboard/#explore-your-images). As we are currently working in the terminal, let's take a look at listing images using the CLI.
+
+To list images, simply run `docker images` command. You should see at least 2 images listed. One for the base image `3.8-slim-buster` and the other for the image we just built `python-docker:latest`.
+
+### Tag Images
+As mentioned earlier, an image name is made up of slash-separated name components. Name components may contain lowercase letters, digits, and separators. A separator is defined as a period, one or two underscores, or one or more dashes. A name component may not start or end with a separator.
+
+An image is made up of a manifest and a list of layers. Do not worry too much about manifests and layers at this point other than a "tag" points to a combination of these artifacts. You can have multiple tags for an image. Let's create a second tag for the image we build and take a look at its layers.
+
+To create a new tag for the image we've built already, run the following command:
+```
+docker tag python-docker:latest python-docker:v1.0.0
+```
+The `docker tag` command creates a new tag for an image. it does **NOT** create a new image. The tag points to the same image and is just another way to reference the image.
+
+Now run the `docker images` command to see a list of our local images. You can see that we have two images that start with `python-docker`. We know they are the same image because if you take a look at the `IMAGE ID` column, you can see that the values are the same for the two images.
+
+Let's remove the tag that we just created. To do this, we'll use the `rmi` command. The `rmi` command stands for *remove image*.
+```
+$ docker rmi python-docker:v1.0.0
+Untagged: python-docker:v1.0.0
+```
+Note that the response from Docker tells us that the image has not been removed but only "untagged". You can check this by running the `docker images` command. Our iamge that was tagged with `:v1.0.0` has been removed, but we still have the `python-docker:latest` tag available on our machine.
