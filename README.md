@@ -6,7 +6,10 @@ Source: https://docs.docker.com/language/python/
 * [Docker running locally](https://docs.docker.com/desktop/)
 * [An IDE or a text editor to edit files - VSCode](https://code.visualstudio.com/Download)
 
-## Tutorial Instructions
+---
+
+# Tutorial Instructions
+## Build Images
 ### Directory Setup
 Create a simple Python application using the Flask framework. Create a directory named `python-docker` and follow the steps to create a simple web server:
 ```
@@ -166,3 +169,124 @@ $ docker rmi python-docker:v1.0.0
 Untagged: python-docker:v1.0.0
 ```
 Note that the response from Docker tells us that the image has not been removed but only "untagged". You can check this by running the `docker images` command. Our iamge that was tagged with `:v1.0.0` has been removed, but we still have the `python-docker:latest` tag available on our machine.
+
+## Run Containers
+### Overview
+Now that we've created our sample application, created a Dockerfile that will produce an image, and created an image using the docker command `docker build`, we can run that image and see if our application is running correctly.
+
+A container is a normal operating system process except that this process is isolated in that it has its own file system, its own networking, and its own isolated process tree separated from the host.
+
+TO run an image inside of a container, we use the `docker run` command. The `docker run` command requires one parameter, which is the name of the image. Let's start our image and make sure it's running correctly.
+```
+docker run python-docker
+```
+After running this command, you'll notice that you were not returned to the command prompt. This is because our application it a REST server and runs in a loop waiting for incoming requests without returning control back to the OS until we stop the container.
+
+Let's make a `GET` request to the server using the `curl` command.
+```
+$ curl localhost:8000
+curl: (7) Failed to connect to localhost port 8000: Connection refused
+```
+As you can see, our `curl` command failed because the connection to our server was refused. This means we were not able to connect to the localhost on `port 8000`. This is expected because our container is run in isolation which includes networking. Let's stop the container and restart with `port 8000` published on our local network.
+
+To stop the container, press `ctrl-c`. This will return you to the terminal prompt.
+
+To publish a port for our container, we'll use the `--publish` flag (`-p` for short) on the `docker run` command. The format of the `--publish` command is `[host port]:[container port]`. So, if we wanted to expose port 8000 inside the container to port 3000 outside the container, we would pass `3000:8000` to the `--publish` flag.
+
+We did not specify a port when running the flask application in the container and the default is 5000. If we want our previous request going to port 8000 to work, we can map the host's port 8000 to the container's port 5000:
+```
+docker run --publish 8000:5000 python-docker
+```
+Now let's rerun the curl command from above:
+```
+$ curl localhost:8000
+Hello, Docker!
+```
+Success! 🎉 We were able to connect to the application running inside of our container on port 8000. Switch back to the terminal where your container is running and you should see the GET request logged to the console.
+```
+172.17.0.1 - - [15/Mar/2021 01:42:57] "GET / HTTP/1.1" 200 -
+```
+Press `ctrl-c` to stop the container.
+
+### Run in detached mode
+This is great so far, but our sample application is a web server and we don't have to be connected to the conatiner. Docker can run you container in detached mode or in the background. To do this, we can use the `--detach` or `-d` for short. Docker starts your container the same as before but this time will "detach" from the container and return you to the terminal prompt.
+```
+$ docker run -d -p 8000:5000 python-docker
+8128ca689293a240daef647aa916f958c8d624ffab426687eca46a9980bbec77
+```
+Docker started our container in the background and printed the Container ID on the terminal.
+
+Again, let's make sure that our container is running properly. Run the same curl command from above.
+```
+$ curl localhost:8000
+Hello, Docker!
+```
+
+### List Containers
+Since we ran our container in the background, how do we know if our container is running or what other containers are running on our machine? Well, we can run the `docker ps` command. Just like on Linux to see a list of processes on your machine, we would run the `ps` command. In the same spirit, we can run the `docker ps` command which displays a list of containers running on our machine.
+```
+$ docker ps
+CONTAINER ID   IMAGE           COMMAND                  CREATED         STATUS         PORTS                    NAMES
+8128ca689293   python-docker   "python3 -m flask ru…"   3 minutes ago   Up 3 minutes   0.0.0.0:8000->5000/tcp   objective_elgamal
+```
+The `docker ps` command provides a bunch of information about our running containers. We can see the container ID, the image running inside the container, the command that was used to start the container, when it was created, the status, ports that are exposed, and the name of the container.
+
+You are probably wondering where the name of our container is coming from. Since we didn't provide a name for the container when we started it, Docker generated a random name. We'll fix this in a minute, but first we need to stop the container. To stop the container, run the `docker stop` command which does just that, stops the container. You need to pass the name of the container or you can use the container ID.
+```
+$ docker stop 8128ca689293
+```
+Now rerun the `docker ps` command to see a list of running containers.
+```
+$ docker ps
+CONTAINER ID        IMAGE               COMMAND             CREATED             STATUS              PORTS               NAMES
+```
+
+### Stop, Start, and Name Containers
+You can start, stop, and restart Docker containers. When we stop a container, it is not removed, but the status is changed to stopped and the process inside the container is stopped. When we ran the `docker ps` command in the previous module, the default output only shows running containers. When we pass the `--all` flag (or `-a` for short), we see all the containers on our machine, irrespective of their start or stop status. 
+```
+$ docker ps -a
+CONTAINER ID        IMAGE               COMMAND                  CREATED             STATUS                      PORTS               NAMES
+8128ca689293   python-docker       "python3 -m flask ru…"   12 minutes ago   Exited (137) 3 minutes ago             objective_elgamal
+2b0c1b2a0192   python-docker       "python3 -m flask ru…"   14 minutes ago   Exited (0) 14 minutes ago              stupefied_kapitsa
+fdfd4f3fca3b   python-docker       "python3 -m flask ru…"   27 minutes ago   Exited (0) 26 minutes ago              vigilant_kirch
+```
+You should now see several containers listed. These are containers that we started and stopped but have not been removed.
+
+Let's restart the container that we just stopped. Locate the name or container ID of the container we just stopped, and replace the name of the container below in the restart command.
+```
+$ docker restart 8128ca689293
+```
+Now list all the containers again using the `docker ps` command.
+```
+$ docker ps --all
+CONTAINER ID        IMAGE               COMMAND                  CREATED             STATUS                      PORTS                    NAMES
+8128ca689293   python-docker       "python3 -m flask ru…"   16 minutes ago   Up 4 seconds                0.0.0.0:8000->5000/tcp   objective_elgamal
+2b0c1b2a0192   python-docker       "python3 -m flask ru…"   19 minutes ago   Exited (0) 19 minutes ago                            stupefied_kapitsa
+fdfd4f3fca3b   python-docker       "python3 -m flask ru…"   31 minutes ago   Exited (0) 30 minutes ago                            vigilant_kirch
+```
+Notice that the container we just restarted has been started in detached mode and has port 8000 exposed. Also, observe the status of the container is "Up X seconds". When you restart a container, it starts with the same flags or commands that it was originally started with.
+
+Now, let's stop and remove all of our containers and take a look at fixing the random naming issue. Stop the container we just started. Find the name or container ID of your running container and replace the name in the command below with the name or container ID on your system.
+```
+$ docker stop 8128ca689293
+8128ca689293
+```
+Now that all of our containers are stopped, let's remove them. When you remove a container, it is no longer running, nor is it in the stopped status. The process inside the container has bee stopped and the metadata for the container has been removed.
+
+To remove a container, simply run the `docker rm` command passing the container name or container ID. You can pass multiple container names to the command using a single command. Again, replace the container names in the following command with the container names or container IDs from your system.
+```
+$ docker rm 8128ca689293 2b0c1b2a0192 fdfd4f3fca3b
+``` 
+Run the `docker ps --all` command again to see that all containers are removed.
+
+Now, let's address the random naming issue. Standard practice is to name your containers for the simple reason that it is easier to identify what is running in the container and what application or service it is associated with.
+
+To name a container, we just need to pass the `--name` flag to the `docker run` command.
+```
+$ docker run -dp 8000:5000 --name rest-server python-docker
+7f73b0465e67c80ff2d0596f42bdadb99d47b4a31de712ea7bcf5f455b1790c5
+$ docker ps
+CONTAINER ID   IMAGE           COMMAND                  CREATED          STATUS          PORTS                    NAMES
+7f73b0465e67   python-docker   "python3 -m flask ru…"   14 seconds ago   Up 13 seconds   0.0.0.0:8000->5000/tcp   rest-server
+```
+That's better! We can now easily identify our container based on the name.
